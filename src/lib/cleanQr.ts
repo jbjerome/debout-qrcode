@@ -2,6 +2,23 @@ import qrcode from "qrcode-generator";
 import type { QrSettings } from "./qr";
 import { iconParts, outline } from "./icons";
 
+// Rectangle à coins arrondis (tracé fermé).
+function rrect(x: number, y: number, w: number, h: number, r: number): string {
+  return (
+    `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}` +
+    `v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}` +
+    `a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`
+  );
+}
+
+// Motif de repérage style « carré arrondi Debout », conforme au ratio 1:1:3:1:1 :
+// cadre arrondi 7×7 (bord 1 module, troué) + point central arrondi 3×3.
+function finderEye(x: number, y: number): string {
+  const ring = `<path fill-rule="evenodd" d="${rrect(x, y, 7, 7, 2)}${rrect(x + 1, y + 1, 5, 5, 1.3)}"/>`;
+  const dot = `<path d="${rrect(x + 2, y + 2, 3, 3, 0.85)}"/>`;
+  return ring + dot;
+}
+
 // Le typage @types/qrcode-generator n'expose pas ces méthodes : on les déclare.
 interface QrModel {
   addData(data: string): void;
@@ -18,28 +35,36 @@ function isFinder(r: number, c: number, n: number): boolean {
   return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
 }
 
-// Cellule 1×1 dont seuls les coins « convexes » (deux voisins absents) sont
-// arrondis : les modules adjacents fusionnent en blocs aux coins arrondis.
-function roundedCell(
-  x: number,
-  y: number,
-  tl: boolean,
-  tr: boolean,
-  br: boolean,
-  bl: boolean,
-): string {
-  const a = 0.5;
+// État d'un coin de cellule : 0 = carré, 1 = convexe (arrondi vers l'extérieur),
+// 2 = concave (lissé vers l'intérieur, pour le mode « extra arrondi »).
+type Corner = 0 | 1 | 2;
+
+const A = 0.5; // rayon (= moitié d'un module → arrondi maximal)
+
+// Tracé d'une cellule 1×1 avec un état par coin.
+// in/out = points de raccord sur les arêtes ; pour un coin carré, in = out = sommet.
+function cellPath(x: number, y: number, tl: Corner, tr: Corner, br: Corner, bl: Corner): string {
   const x1 = x + 1;
   const y1 = y + 1;
-  let p = `M${x + (tl ? a : 0)} ${y}`;
-  p += `H${x1 - (tr ? a : 0)}`;
-  if (tr) p += `A${a} ${a} 0 0 1 ${x1} ${y + a}`;
-  p += `V${y1 - (br ? a : 0)}`;
-  if (br) p += `A${a} ${a} 0 0 1 ${x1 - a} ${y1}`;
-  p += `H${x + (bl ? a : 0)}`;
-  if (bl) p += `A${a} ${a} 0 0 1 ${x} ${y1 - a}`;
-  p += `V${y + (tl ? a : 0)}`;
-  if (tl) p += `A${a} ${a} 0 0 1 ${x + a} ${y}`;
+  // Pour chaque coin : sommet, point d'entrée (arête précédente), point de sortie (arête suivante).
+  const corners = [
+    { st: tl, vx: x, vy: y, inx: x, iny: y + A, outx: x + A, outy: y },
+    { st: tr, vx: x1, vy: y, inx: x1 - A, iny: y, outx: x1, outy: y + A },
+    { st: br, vx: x1, vy: y1, inx: x1, iny: y1 - A, outx: x1 - A, outy: y1 },
+    { st: bl, vx: x, vy: y1, inx: x + A, iny: y1, outx: x, outy: y1 - A },
+  ].map((k) =>
+    k.st === 0 ? { in: [k.vx, k.vy], out: [k.vx, k.vy], st: k.st } : { in: [k.inx, k.iny], out: [k.outx, k.outy], st: k.st },
+  );
+
+  const arc = (k: (typeof corners)[number]) =>
+    k.st === 0 ? "" : `A${A} ${A} 0 0 ${k.st === 1 ? 1 : 0} ${k.out[0]} ${k.out[1]}`;
+
+  const [TL, TR, BR, BL] = corners;
+  let p = `M${TL.out[0]} ${TL.out[1]}`;
+  p += `L${TR.in[0]} ${TR.in[1]}${arc(TR)}`;
+  p += `L${BR.in[0]} ${BR.in[1]}${arc(BR)}`;
+  p += `L${BL.in[0]} ${BL.in[1]}${arc(BL)}`;
+  p += `L${TL.in[0]} ${TL.in[1]}${arc(TL)}`;
   return p + "Z";
 }
 
@@ -95,12 +120,27 @@ export function buildCleanSvg(settings: QrSettings): string {
   const dark = (r: number, c: number) =>
     r >= 0 && r < n && c >= 0 && c < n && qr.isDark(r, c) && !reserved(r, c);
 
-  // Un module est rendu en « plein » (path fusionné) s'il est carré, ou s'il
-  // appartient à un motif de repérage. Sinon en forme (rond/arrondi).
-  const asSquare = (r: number, c: number) => dotsType === "square" || isFinder(r, c, n);
+  // Les motifs de repérage (gros carrés) ont leur propre tracé → couleur dédiée.
+  // En mode carré ils restent carrés ; sinon ils sont arrondis comme les modules.
+  // `concave` (mode extra) lisse aussi les jonctions intérieures.
+  const cell = (r: number, c: number, concave: boolean) => {
+    const up = dark(r - 1, c);
+    const dn = dark(r + 1, c);
+    const le = dark(r, c - 1);
+    const ri = dark(r, c + 1);
+    const st = (cvx: boolean, ccv: boolean): Corner => (cvx ? 1 : concave && ccv ? 2 : 0);
+    const tl = st(!up && !le, up && le && !dark(r - 1, c - 1));
+    const tr = st(!up && !ri, up && ri && !dark(r - 1, c + 1));
+    const br = st(!dn && !ri, dn && ri && !dark(r + 1, c + 1));
+    const bl = st(!dn && !le, dn && le && !dark(r + 1, c - 1));
+    return cellPath(c + QUIET, r + QUIET, tl, tr, br, bl);
+  };
 
-  let d = "";
-  let shapes = "";
+  const logoFinder = settings.cornerStyle === "square";
+
+  let finderPath = "";
+  let dataPath = "";
+  let dataShapes = "";
   for (let r = 0; r < n; r++) {
     let c = 0;
     while (c < n) {
@@ -108,28 +148,48 @@ export function buildCleanSvg(settings: QrSettings): string {
         c++;
         continue;
       }
-      if (asSquare(r, c)) {
+      const fin = isFinder(r, c, n);
+      if (fin && logoFinder) {
+        c++;
+        continue;
+      }
+      if (dotsType === "square") {
+        // Runs fusionnés, sans franchir la frontière repère/données.
         let len = 1;
-        while (dark(r, c + len) && asSquare(r, c + len)) len++;
-        d += `M${c + QUIET} ${r + QUIET}h${len}v1h-${len}z`;
+        while (dark(r, c + len) && isFinder(r, c + len, n) === fin) len++;
+        const run = `M${c + QUIET} ${r + QUIET}h${len}v1h-${len}z`;
+        if (fin) finderPath += run;
+        else dataPath += run;
         c += len;
+      } else if (fin) {
+        // Repères : arrondis (concaves en mode extra), pour rester lisibles.
+        finderPath += cell(r, c, dotsType === "extra");
+        c++;
       } else if (dotsType === "dots") {
-        shapes += `<circle cx="${c + QUIET + 0.5}" cy="${r + QUIET + 0.5}" r="0.45"/>`;
+        dataShapes += `<circle cx="${c + QUIET + 0.5}" cy="${r + QUIET + 0.5}" r="0.45"/>`;
         c++;
       } else {
-        // Arrondi : coins extérieurs (deux voisins absents) seulement.
-        const up = dark(r - 1, c);
-        const dn = dark(r + 1, c);
-        const le = dark(r, c - 1);
-        const ri = dark(r, c + 1);
-        d += roundedCell(c + QUIET, r + QUIET, !up && !le, !up && !ri, !dn && !ri, !dn && !le);
+        // Arrondi / extra : cellule arrondie (lissage concave si extra).
+        dataPath += cell(r, c, dotsType === "extra");
         c++;
       }
     }
   }
 
+  // Repères « carré arrondi » aux 3 emplacements (7×7 modules chacun).
+  let finderShapes = "";
+  if (logoFinder) {
+    for (const [fr, fc] of [
+      [0, 0],
+      [0, n - 7],
+      [n - 7, 0],
+    ]) {
+      finderShapes += finderEye(fc + QUIET, fr + QUIET);
+    }
+  }
+
   const gradId = "qr-grad";
-  const fill = gradient ? `url(#${gradId})` : dotsColor;
+  const dataFill = gradient ? `url(#${gradId})` : dotsColor;
   const defs = gradient
     ? `<defs><linearGradient id="${gradId}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${dim}" y2="${dim}">` +
       `<stop offset="0" stop-color="${gradient.from}"/>` +
@@ -138,8 +198,10 @@ export function buildCleanSvg(settings: QrSettings): string {
     : "";
   const bg = transparentBg ? "" : `<rect width="${dim}" height="${dim}" fill="${bgColor}"/>`;
   const modules =
-    (d ? `<path d="${d}" fill="${fill}"/>` : "") +
-    (shapes ? `<g fill="${fill}">${shapes}</g>` : "");
+    (finderPath ? `<path d="${finderPath}" fill="${settings.cornerColor}"/>` : "") +
+    (finderShapes ? `<g fill="${settings.cornerColor}">${finderShapes}</g>` : "") +
+    (dataPath ? `<path d="${dataPath}" fill="${dataFill}"/>` : "") +
+    (dataShapes ? `<g fill="${dataFill}">${dataShapes}</g>` : "");
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +

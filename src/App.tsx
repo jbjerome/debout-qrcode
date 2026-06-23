@@ -13,6 +13,8 @@ const DEFAULTS: QrSettings = {
   gradient: null,
   transparentBg: false,
   dotsType: "square",
+  cornerColor: BRAND.fuchsia,
+  cornerStyle: "auto",
   icon: "none",
   iconColor: BRAND.noir,
 };
@@ -48,8 +50,23 @@ export default function App() {
       </div>
 
       <footer className="footer">
-        <span aria-hidden="true">✊</span> Développé par JB — Comtois Debout —
-        jean-baptiste(at)iweez.fr
+        <p>
+          <span aria-hidden="true">✊</span> Développé par JB — Comtois Debout —
+          jean-baptiste(at)iweez.fr
+        </p>
+        <p>
+          <a href="https://github.com/jbjerome/debout-qrcode" target="_blank" rel="noopener noreferrer">
+            GitHub
+          </a>
+          {" · "}
+          <a
+            href="https://github.com/jbjerome/debout-qrcode/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Licence GPL-3.0
+          </a>
+        </p>
       </footer>
     </main>
   );

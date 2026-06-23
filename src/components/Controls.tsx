@@ -1,7 +1,13 @@
 import { useState, type CSSProperties } from "react";
 import { PRESETS, SWATCHES, type Preset } from "../lib/brand";
 import { ICONS, type IconKey } from "../lib/icons";
-import { DOT_STYLES, type DotsType, type QrSettings } from "../lib/qr";
+import {
+  CORNER_STYLES,
+  DOT_STYLES,
+  type CornerStyle,
+  type DotsType,
+  type QrSettings,
+} from "../lib/qr";
 import ColorInput from "./ColorInput";
 
 type Props = {
@@ -48,6 +54,7 @@ export default function Controls({ settings, onChange, onDownload }: Props) {
     onChange({
       ...settings,
       dotsColor: p.dotsColor,
+      cornerColor: p.gradient ? p.gradient.from : p.dotsColor,
       bgColor: p.bgColor,
       gradient: p.gradient,
       transparentBg: false,
@@ -122,6 +129,45 @@ export default function Controls({ settings, onChange, onDownload }: Props) {
                   style={{ background: c.value }}
                   title={`Modules : ${c.name}`}
                   onClick={() => onChange({ ...settings, dotsColor: c.value, gradient: null })}
+                />
+              ))}
+            </div>
+          </div>
+
+          <label className="field">
+            <span>Forme des coins</span>
+            <select
+              className="select"
+              value={settings.cornerStyle}
+              onChange={(e) => onChange({ ...settings, cornerStyle: e.target.value as CornerStyle })}
+            >
+              {CORNER_STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field">
+            <span>Couleur des coins</span>
+            <ColorInput
+              value={settings.cornerColor}
+              onChange={(hex) => onChange({ ...settings, cornerColor: hex })}
+            />
+          </div>
+
+          <div className="field">
+            <span>Palette des coins</span>
+            <div className="swatches">
+              {SWATCHES.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  className="swatch"
+                  style={{ background: c.value }}
+                  title={`Coins : ${c.name}`}
+                  onClick={() => onChange({ ...settings, cornerColor: c.value })}
                 />
               ))}
             </div>
