@@ -35,29 +35,25 @@ function isFinder(r: number, c: number, n: number): boolean {
   return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
 }
 
-// État d'un coin de cellule : 0 = carré, 1 = convexe (arrondi vers l'extérieur),
-// 2 = concave (lissé vers l'intérieur, pour le mode « extra arrondi »).
-type Corner = 0 | 1 | 2;
-
+// État d'un coin de cellule : true = arrondi (convexe), false = carré.
 const A = 0.5; // rayon (= moitié d'un module → arrondi maximal)
 
-// Tracé d'une cellule 1×1 avec un état par coin.
+// Tracé d'une cellule 1×1 ; seuls les coins convexes (deux voisins absents) sont arrondis.
 // in/out = points de raccord sur les arêtes ; pour un coin carré, in = out = sommet.
-function cellPath(x: number, y: number, tl: Corner, tr: Corner, br: Corner, bl: Corner): string {
+function cellPath(x: number, y: number, tl: boolean, tr: boolean, br: boolean, bl: boolean): string {
   const x1 = x + 1;
   const y1 = y + 1;
-  // Pour chaque coin : sommet, point d'entrée (arête précédente), point de sortie (arête suivante).
   const corners = [
     { st: tl, vx: x, vy: y, inx: x, iny: y + A, outx: x + A, outy: y },
     { st: tr, vx: x1, vy: y, inx: x1 - A, iny: y, outx: x1, outy: y + A },
     { st: br, vx: x1, vy: y1, inx: x1, iny: y1 - A, outx: x1 - A, outy: y1 },
     { st: bl, vx: x, vy: y1, inx: x + A, iny: y1, outx: x, outy: y1 - A },
   ].map((k) =>
-    k.st === 0 ? { in: [k.vx, k.vy], out: [k.vx, k.vy], st: k.st } : { in: [k.inx, k.iny], out: [k.outx, k.outy], st: k.st },
+    k.st ? { in: [k.inx, k.iny], out: [k.outx, k.outy], st: k.st } : { in: [k.vx, k.vy], out: [k.vx, k.vy], st: k.st },
   );
 
   const arc = (k: (typeof corners)[number]) =>
-    k.st === 0 ? "" : `A${A} ${A} 0 0 ${k.st === 1 ? 1 : 0} ${k.out[0]} ${k.out[1]}`;
+    k.st ? `A${A} ${A} 0 0 1 ${k.out[0]} ${k.out[1]}` : "";
 
   const [TL, TR, BR, BL] = corners;
   let p = `M${TL.out[0]} ${TL.out[1]}`;
@@ -122,18 +118,12 @@ export function buildCleanSvg(settings: QrSettings): string {
 
   // Les motifs de repérage (gros carrés) ont leur propre tracé → couleur dédiée.
   // En mode carré ils restent carrés ; sinon ils sont arrondis comme les modules.
-  // `concave` (mode extra) lisse aussi les jonctions intérieures.
-  const cell = (r: number, c: number, concave: boolean) => {
+  const cell = (r: number, c: number) => {
     const up = dark(r - 1, c);
     const dn = dark(r + 1, c);
     const le = dark(r, c - 1);
     const ri = dark(r, c + 1);
-    const st = (cvx: boolean, ccv: boolean): Corner => (cvx ? 1 : concave && ccv ? 2 : 0);
-    const tl = st(!up && !le, up && le && !dark(r - 1, c - 1));
-    const tr = st(!up && !ri, up && ri && !dark(r - 1, c + 1));
-    const br = st(!dn && !ri, dn && ri && !dark(r + 1, c + 1));
-    const bl = st(!dn && !le, dn && le && !dark(r + 1, c - 1));
-    return cellPath(c + QUIET, r + QUIET, tl, tr, br, bl);
+    return cellPath(c + QUIET, r + QUIET, !up && !le, !up && !ri, !dn && !ri, !dn && !le);
   };
 
   const logoFinder = settings.cornerStyle === "square";
@@ -162,15 +152,15 @@ export function buildCleanSvg(settings: QrSettings): string {
         else dataPath += run;
         c += len;
       } else if (fin) {
-        // Repères : arrondis (concaves en mode extra), pour rester lisibles.
-        finderPath += cell(r, c, dotsType === "extra");
+        // Repères : arrondis pour rester lisibles.
+        finderPath += cell(r, c);
         c++;
       } else if (dotsType === "dots") {
         dataShapes += `<circle cx="${c + QUIET + 0.5}" cy="${r + QUIET + 0.5}" r="0.45"/>`;
         c++;
       } else {
-        // Arrondi / extra : cellule arrondie (lissage concave si extra).
-        dataPath += cell(r, c, dotsType === "extra");
+        // Arrondi : cellule aux coins extérieurs arrondis.
+        dataPath += cell(r, c);
         c++;
       }
     }
