@@ -22,33 +22,40 @@ function parseViewBox(svg: string): [number, number, number, number] {
   return [a, b, c, d];
 }
 
-// Ajoute un contour (stroke) au(x) path(s). paint-order="stroke" → le remplissage
-// recouvre la moitié interne, ne laissant visible que la moitié externe du trait.
-export function addStroke(inner: string, color: string, width: number): string {
-  return inner.replace(
-    /<path /g,
-    `<path stroke="${color}" stroke-width="${width}" paint-order="stroke" ` +
-      `stroke-linejoin="round" stroke-linecap="round" `,
-  );
+// Contour externe sans `paint-order` (non supporté par Illustrator) : on superpose
+// deux tracés. Dessous, une copie « grossie » couleur du contour (fill + stroke) ;
+// dessus, l'icône d'origine. Seule la partie externe du stroke reste visible.
+export function outline(inner: string, color: string, width: number): string {
+  const bottom = inner
+    .replace(/style="fill:[^"]*"/i, `style="fill:${color};"`)
+    .replace(
+      /<path /g,
+      `<path stroke="${color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round" `,
+    );
+  return bottom + inner;
 }
 
-// SVG complet recoloré → data URL (pour l'option `image` de qr-code-styling).
+// SVG complet recoloré → data URL (utilisé pour le logo du titre via <img>).
 // Si `outline` est fourni, on épaissit le viewBox pour ne pas rogner le contour.
 export function iconDataUrl(
   key: IconKey,
   color: string,
-  outline?: string,
+  outlineColor?: string,
 ): string | undefined {
   if (key === "none") return undefined;
-  let svg = recolor(RAW[key], color);
-  if (outline) {
-    const [minX, minY, w, h] = parseViewBox(svg);
-    const stroke = Math.min(w, h) * 0.22;
-    const pad = stroke / 2;
-    const vb = `${minX - pad} ${minY - pad} ${w + stroke} ${h + stroke}`;
-    svg = svg.replace(/viewBox="[^"]+"/, `viewBox="${vb}"`);
-    svg = addStroke(svg, outline, stroke);
-  }
+  const raw = recolor(RAW[key], color);
+  if (!outlineColor) return `data:image/svg+xml,${encodeURIComponent(raw)}`;
+
+  // viewBox élargi pour ne pas rogner le halo, contour via deux tracés superposés.
+  const [minX, minY, w, h] = parseViewBox(raw);
+  const stroke = Math.min(w, h) * 0.22;
+  const pad = stroke / 2;
+  const vb = `${minX - pad} ${minY - pad} ${w + stroke} ${h + stroke}`;
+  const inner = raw.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">` +
+    outline(inner, outlineColor, stroke) +
+    `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
