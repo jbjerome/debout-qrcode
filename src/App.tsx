@@ -13,9 +13,9 @@ const DEFAULTS: QrSettings = {
   gradient: null,
   transparentBg: false,
   dotsType: "square",
-  cornerColor: BRAND.fuchsia,
-  cornerStyle: "auto",
-  icon: "none",
+  cornerColor: BRAND.noir,
+  cornerStyle: "square",
+  icon: "d",
   iconColor: BRAND.noir,
 };
 
