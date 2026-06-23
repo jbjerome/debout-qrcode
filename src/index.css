@@ -50,11 +50,13 @@ body {
   height: 52px;
   flex: 0 0 auto;
   background: var(--fuchsia);
-  color: var(--beige);
   border-radius: 12px;
-  font-weight: 900;
-  font-size: 1.5rem;
-  letter-spacing: -1px;
+}
+
+.badge img {
+  width: auto;
+  height: 30px;
+  display: block;
 }
 
 h1 {
@@ -169,6 +171,44 @@ h1 {
   cursor: pointer;
 }
 
+/* Onglets */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1.5px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  padding: 11px 8px;
+  margin-bottom: -1.5px;
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab--active {
+  color: var(--text);
+  border-bottom-color: var(--fuchsia);
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .select {
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -185,6 +225,51 @@ h1 {
 .select:focus {
   outline: 2px solid var(--accent);
   border-color: var(--accent);
+}
+
+/* Color picker + saisie hexa */
+.color-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-input input[type="color"] {
+  width: 42px;
+  flex: 0 0 auto;
+}
+
+.hex {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  background: #fff;
+}
+
+.hex:focus {
+  outline: 2px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.hex:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.swatch:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.swatch:disabled:hover {
+  transform: none;
 }
 
 .row {

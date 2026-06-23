@@ -1,5 +1,6 @@
 import QRCodeStyling, { type Options } from "qr-code-styling";
 import type { Gradient } from "./brand";
+import { iconDataUrl, type IconKey } from "./icons";
 
 // Sous-ensemble de types de modules proposés dans l'UI.
 export type DotsType = "square" | "rounded" | "dots";
@@ -18,6 +19,8 @@ export type QrSettings = {
   gradient: Gradient | null;
   transparentBg: boolean;
   dotsType: DotsType;
+  icon: IconKey;
+  iconColor: string;
 };
 
 export function buildOptions({
@@ -28,6 +31,8 @@ export function buildOptions({
   gradient,
   transparentBg,
   dotsType,
+  icon,
+  iconColor,
 }: QrSettings): Options {
   // Le fill des modules : dégradé deux tons si défini, sinon couleur unie.
   const fill = gradient
@@ -59,6 +64,14 @@ export function buildOptions({
     backgroundOptions: { color: transparentBg ? "transparent" : bgColor },
     cornersSquareOptions: { color: cornerColor, type: solid ? "square" : "extra-rounded" },
     cornersDotOptions: { color: cornerColor, type: solid ? "square" : "dot" },
+    // Contour couleur du fond (sauf fond transparent → marge d'1 module à la place).
+    image: iconDataUrl(icon, iconColor, transparentBg ? undefined : bgColor),
+    imageOptions: {
+      margin: transparentBg ? Math.round(size / 33) : 2,
+      imageSize: 0.45,
+      hideBackgroundDots: true,
+      crossOrigin: "anonymous",
+    },
   };
 }
 

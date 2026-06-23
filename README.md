@@ -10,10 +10,18 @@ L'interface et les QR codes reprennent la charte **Debout!** :
 
 - **Presets biton** prêts à l'emploi (couleur des modules + couleur de fond), dont deux dégradés deux tons (Fuchsia→Mauve, Fuchsia→Turquoise).
 - **Palette** : Hot Fuchsia `#ff4d56`, Antique White `#f9f7e4`, Noir `#000000`, Turquoise `#5fccb7`, Mauve `#de6ef9`, Crimson `#3a0a23`.
-- Réglage manuel possible des couleurs modules/fond et de la taille.
+- Réglage manuel des couleurs modules/fond/icône (color picker **ou** code hexa) et de la taille.
+- **Icône centrale** au choix (symbole « ! » ou logo « D! », depuis `assets/`), recolorable. Séparation des modules par un **contour de la couleur du fond** appliqué sur l'icône (sur fond transparent, où le contour n'a pas de sens, on retombe sur une marge d'1 module).
 - Typo **Inter** auto-hébergée (`@fontsource/inter`, pas de CDN Google → conforme RGPD).
 
 Les couleurs et presets sont centralisés dans `src/lib/brand.ts`. Pour la lecture, privilégier les combinaisons à fort contraste (ex. Noir/Beige) ; le niveau de correction d'erreur est réglé sur `Q` pour la robustesse.
+
+### Rendu des modules
+
+- **Carré plein** (défaut) : SVG généré en interne (`src/lib/cleanQr.ts`) sous forme d'un **seul `<path>`** avec fusion des modules par runs — sortie compacte, sans couture entre modules, `shape-rendering="crispEdges"`.
+- **Arrondi / Points** : rendus via `qr-code-styling`.
+
+Dans les deux cas le QR reste scannable (vérifié au décodage).
 
 ## Développement
 

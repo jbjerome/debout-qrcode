@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from "react";
-import type QRCodeStyling from "qr-code-styling";
 import Controls from "./components/Controls";
-import QrPreview from "./components/QrPreview";
+import QrPreview, { type Downloader } from "./components/QrPreview";
 import { BRAND } from "./lib/brand";
+import { iconDataUrl } from "./lib/icons";
 import type { QrSettings } from "./lib/qr";
 
 const DEFAULTS: QrSettings = {
@@ -13,25 +13,29 @@ const DEFAULTS: QrSettings = {
   gradient: null,
   transparentBg: false,
   dotsType: "square",
+  icon: "none",
+  iconColor: BRAND.noir,
 };
 
 export default function App() {
   const [settings, setSettings] = useState<QrSettings>(DEFAULTS);
-  const qrRef = useRef<QRCodeStyling | null>(null);
+  const downloadRef = useRef<Downloader>(() => {});
 
   // Stable : évite que QrPreview se recrée à chaque rendu.
-  const handleReady = useCallback((qr: QRCodeStyling) => {
-    qrRef.current = qr;
+  const handleReady = useCallback((download: Downloader) => {
+    downloadRef.current = download;
   }, []);
 
   const handleDownload = (extension: "png" | "svg") => {
-    qrRef.current?.download({ name: "qr-code-debout", extension });
+    downloadRef.current(extension);
   };
 
   return (
     <main className="app">
       <header className="header">
-        <span className="badge">D!</span>
+        <span className="badge">
+          <img src={iconDataUrl("d", BRAND.beige)} alt="Debout!" />
+        </span>
         <div>
           <h1>Générateur de QR code</h1>
           <p className="subtitle">Aux couleurs de Debout! — télécharge en PNG ou SVG.</p>

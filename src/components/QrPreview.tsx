@@ -1,45 +1,51 @@
 import { useEffect, useRef } from "react";
 import type QRCodeStyling from "qr-code-styling";
 import { buildOptions, createQr, type QrSettings } from "../lib/qr";
+import { buildCleanSvg, downloadCleanPng, downloadCleanSvg } from "../lib/cleanQr";
+
+const NAME = "qr-code-debout";
+
+export type Downloader = (extension: "png" | "svg") => void;
 
 type Props = {
   settings: QrSettings;
-  onReady: (qr: QRCodeStyling) => void;
+  onReady: (download: Downloader) => void;
 };
 
 export default function QrPreview({ settings, onReady }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<QRCodeStyling | null>(null);
-  const hadGradient = useRef<boolean>(!!settings.gradient);
+  const prev = useRef({ clean: settings.dotsType === "square", gradient: !!settings.gradient });
 
-  const mount = (qr: QRCodeStyling) => {
-    qrRef.current = qr;
-    if (containerRef.current) {
-      containerRef.current.innerHTML = "";
-      qr.append(containerRef.current);
-    }
-    onReady(qr);
-  };
-
-  // Montage initial.
   useEffect(() => {
-    mount(createQr(settings));
-    hadGradient.current = !!settings.gradient;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const el = containerRef.current;
+    if (!el) return;
 
-  // Mise à jour à chaque changement de réglage.
-  useEffect(() => {
-    const gradientToggled = !!settings.gradient !== hadGradient.current;
-    if (gradientToggled) {
-      // update() fusionne les options et ne supprime pas un dégradé existant :
-      // on recrée l'instance quand on bascule dégradé ↔ couleur unie.
-      mount(createQr(settings));
+    // Mode "Carré plein" : SVG maison, modules fusionnés en un seul tracé.
+    if (settings.dotsType === "square") {
+      qrRef.current = null;
+      el.innerHTML = buildCleanSvg(settings);
+      onReady((ext) =>
+        ext === "svg" ? downloadCleanSvg(settings, NAME) : downloadCleanPng(settings, NAME),
+      );
     } else {
-      qrRef.current?.update(buildOptions(settings));
+      // Modes arrondi/points : qr-code-styling.
+      // On recrée l'instance si on arrive du mode propre ou si le dégradé bascule
+      // (update() ne supprime pas un dégradé existant).
+      const needNew =
+        !qrRef.current || prev.current.clean || !!settings.gradient !== prev.current.gradient;
+      if (needNew) {
+        const qr = createQr(settings);
+        qrRef.current = qr;
+        el.innerHTML = "";
+        qr.append(el);
+      } else {
+        qrRef.current?.update(buildOptions(settings));
+      }
+      onReady((ext) => qrRef.current?.download({ name: NAME, extension: ext }));
     }
-    hadGradient.current = !!settings.gradient;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    prev.current = { clean: settings.dotsType === "square", gradient: !!settings.gradient };
   }, [settings, onReady]);
 
   return (

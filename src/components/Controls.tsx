@@ -1,12 +1,22 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { PRESETS, SWATCHES, type Preset } from "../lib/brand";
+import { ICONS, type IconKey } from "../lib/icons";
 import { DOT_STYLES, type DotsType, type QrSettings } from "../lib/qr";
+import ColorInput from "./ColorInput";
 
 type Props = {
   settings: QrSettings;
   onChange: (next: QrSettings) => void;
   onDownload: (extension: "png" | "svg") => void;
 };
+
+type Tab = "code" | "fond" | "icone";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "code", label: "Code" },
+  { id: "fond", label: "Fond" },
+  { id: "icone", label: "Icône" },
+];
 
 function eq(a: string, b: string) {
   return a.toLowerCase() === b.toLowerCase();
@@ -30,7 +40,9 @@ function presetSwatchStyle(p: Preset) {
 }
 
 export default function Controls({ settings, onChange, onDownload }: Props) {
+  const [tab, setTab] = useState<Tab>("code");
   const disabled = settings.url.trim() === "";
+  const noIcon = settings.icon === "none";
 
   const applyPreset = (p: Preset) =>
     onChange({
@@ -74,65 +86,147 @@ export default function Controls({ settings, onChange, onDownload }: Props) {
         </div>
       </div>
 
-      <div className="row">
-        <label className="field">
-          <span>Modules</span>
-          <input
-            type="color"
-            value={settings.dotsColor}
-            onChange={(e) => onChange({ ...settings, dotsColor: e.target.value, gradient: null })}
-          />
-        </label>
-        <label className="field">
-          <span>Fond</span>
-          <input
-            type="color"
-            value={settings.bgColor}
-            disabled={settings.transparentBg}
-            onChange={(e) => onChange({ ...settings, bgColor: e.target.value })}
-          />
-        </label>
+      <div className="tabs" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`tab${tab === t.id ? " tab--active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={settings.transparentBg}
-          onChange={(e) => onChange({ ...settings, transparentBg: e.target.checked })}
-        />
-        <span>Fond transparent</span>
-      </label>
-
-      <div className="field">
-        <span>Palette</span>
-        <div className="swatches">
-          {SWATCHES.map((c) => (
-            <button
-              key={c.name}
-              type="button"
-              className="swatch"
-              style={{ background: c.value }}
-              title={`Modules : ${c.name}`}
-              onClick={() => onChange({ ...settings, dotsColor: c.value, gradient: null })}
+      {tab === "code" && (
+        <div className="tab-panel">
+          <div className="field">
+            <span>Couleur des modules</span>
+            <ColorInput
+              value={settings.dotsColor}
+              onChange={(hex) => onChange({ ...settings, dotsColor: hex, gradient: null })}
             />
-          ))}
-        </div>
-      </div>
+          </div>
 
-      <label className="field">
-        <span>Forme des modules</span>
-        <select
-          className="select"
-          value={settings.dotsType}
-          onChange={(e) => onChange({ ...settings, dotsType: e.target.value as DotsType })}
-        >
-          {DOT_STYLES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <div className="field">
+            <span>Palette</span>
+            <div className="swatches">
+              {SWATCHES.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  className="swatch"
+                  style={{ background: c.value }}
+                  title={`Modules : ${c.name}`}
+                  onClick={() => onChange({ ...settings, dotsColor: c.value, gradient: null })}
+                />
+              ))}
+            </div>
+          </div>
+
+          <label className="field">
+            <span>Forme des modules</span>
+            <select
+              className="select"
+              value={settings.dotsType}
+              onChange={(e) => onChange({ ...settings, dotsType: e.target.value as DotsType })}
+            >
+              {DOT_STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {tab === "fond" && (
+        <div className="tab-panel">
+          <div className="field">
+            <span>Couleur du fond</span>
+            <ColorInput
+              value={settings.bgColor}
+              disabled={settings.transparentBg}
+              onChange={(hex) => onChange({ ...settings, bgColor: hex })}
+            />
+          </div>
+
+          <div className="field">
+            <span>Palette</span>
+            <div className="swatches">
+              {SWATCHES.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  className="swatch"
+                  style={{ background: c.value }}
+                  disabled={settings.transparentBg}
+                  title={`Fond : ${c.name}`}
+                  onClick={() => onChange({ ...settings, bgColor: c.value })}
+                />
+              ))}
+            </div>
+          </div>
+
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={settings.transparentBg}
+              onChange={(e) => onChange({ ...settings, transparentBg: e.target.checked })}
+            />
+            <span>Fond transparent</span>
+          </label>
+        </div>
+      )}
+
+      {tab === "icone" && (
+        <div className="tab-panel">
+          <label className="field">
+            <span>Icône centrale</span>
+            <select
+              className="select"
+              value={settings.icon}
+              onChange={(e) => onChange({ ...settings, icon: e.target.value as IconKey })}
+            >
+              {ICONS.map((i) => (
+                <option key={i.value} value={i.value}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field">
+            <span>Couleur de l'icône</span>
+            <ColorInput
+              value={settings.iconColor}
+              disabled={noIcon}
+              onChange={(hex) => onChange({ ...settings, iconColor: hex })}
+            />
+          </div>
+
+          <div className="field">
+            <span>Palette</span>
+            <div className="swatches">
+              {SWATCHES.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  className="swatch"
+                  style={{ background: c.value }}
+                  disabled={noIcon}
+                  title={`Icône : ${c.name}`}
+                  onClick={() => onChange({ ...settings, iconColor: c.value })}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <label className="field">
         <span>Taille ({settings.size} px)</span>
